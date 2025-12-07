@@ -2,15 +2,23 @@
 
 # Name of the Project
 
-(Put your logo here if you have one )
+A solution to efficiently optimize the logistics of storage boxes in warehouses.
 
 ## Pitch of the project
 
-(context, problematic, solution, 200 words)
+Pitch of the Project: 
+
+Context: Alstom believes that there is room for improving the efficiency of their handling of logistical footprints, through the incorporation of modern technology. This could replace their current methodology, where they use PowerPoint, which in turn proves to be relatively inefficient, as it takes around 3 weeks to complete a single footprint.  
+
+Problematic: Different departments work on the development of the footprints, where they share over and individually adjust the PowerPoint and collaboration is a difficult internal challenge. Additionally, PowerPoint doesn’t offer a 3D view of the “kanban” logistic boxes, so determining the height aspect of said boxes in the workstation space is a challenge that slows down the process of producing the final footprint. 
+
+Solution: Using virtual reality googles, visualization of the box placement can be done directly in the required space, while taking into consideration the available height of the space for the box. VR provides a true 1:1 scale that is immersive for the workstation environment, allowing the user to accurately judge the height and depth of the boxes. 
 
 ## Team
 
-Names + organisation + picture
+
+Andrews Leruth (Technocité), Antoine (RUBIKA), Christian Alexiev (RUBIKA), Deborah Tetart (Technocité), Vincent Vissers (Technocité) et Yasmine Buxant (UCLouvain)
+
 
 ## Structure of the folder
 
