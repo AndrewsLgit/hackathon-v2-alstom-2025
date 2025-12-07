@@ -24,6 +24,9 @@ public class XRClampToSurface : MonoBehaviour
     [Tooltip("Rotation cible si lockRotation est activé")]
     public Vector3 targetRotation = Vector3.zero;
 
+    [Tooltip("Maintient la hauteur même après le release (recommandé pour garder le cube sur la surface)")]
+    public bool maintainHeightWhenNotGrabbed = false;
+
     private XRGrabInteractable grabInteractable;
     private Rigidbody rb;
     private float targetY;
@@ -57,6 +60,12 @@ public class XRClampToSurface : MonoBehaviour
             // Sauvegarde la gravité originale
             originalGravity = rb.useGravity;
             originalRotation = transform.rotation;
+            
+            // Si on doit maintenir la hauteur même sans grab, désactive la gravité dès le début
+            if (maintainHeightWhenNotGrabbed)
+            {
+                rb.useGravity = false;
+            }
         }
 
         // Si aucune surface n'est assignée, essaie de la trouver automatiquement
@@ -78,6 +87,23 @@ public class XRClampToSurface : MonoBehaviour
         if (surface != null)
         {
             targetY = surface.position.y + offsetY;
+            
+            // Si on doit maintenir la hauteur même sans grab, positionne immédiatement
+            if (maintainHeightWhenNotGrabbed)
+            {
+                if (rb != null && !rb.isKinematic)
+                {
+                    Vector3 pos = rb.position;
+                    pos.y = targetY;
+                    rb.position = pos;
+                }
+                else if (rb == null)
+                {
+                    Vector3 pos = transform.position;
+                    pos.y = targetY;
+                    transform.position = pos;
+                }
+            }
         }
 
         // S'abonne aux événements de grab/release
@@ -90,30 +116,22 @@ public class XRClampToSurface : MonoBehaviour
         isGrabbed = true;
         grabStartTime = Time.time;
         
+        // Désactive la gravité IMMÉDIATEMENT pour éviter toute chute
+        if (rb != null)
+        {
+            rb.useGravity = false;
+            // Réinitialise aussi la vélocité verticale immédiatement
+            Vector3 vel = rb.linearVelocity;
+            vel.y = 0f;
+            rb.linearVelocity = vel;
+        }
+        
         if (surface != null)
         {
             targetY = surface.position.y + offsetY;
             
-            // Ajuste doucement la position Y au moment du grab pour éviter le bounce
-            if (rb != null && !rb.isKinematic)
-            {
-                Vector3 pos = rb.position;
-                float currentY = pos.y;
-                float deltaY = targetY - currentY;
-                
-                // Si l'écart est important, ajuste progressivement
-                if (Mathf.Abs(deltaY) > 0.01f)
-                {
-                    pos.y = Mathf.Lerp(currentY, targetY, 0.3f); // Ajuste à 30% pour éviter le bounce brutal
-                    rb.MovePosition(pos);
-                }
-            }
-            else if (rb == null)
-            {
-                Vector3 pos = transform.position;
-                pos.y = targetY;
-                transform.position = pos;
-            }
+            // NE force PAS immédiatement la position pour éviter le conflit avec le toolkit
+            // La correction se fera dans LateUpdate() de manière plus douce
         }
 
         // Sauvegarde la rotation actuelle au moment du grab
@@ -121,22 +139,29 @@ public class XRClampToSurface : MonoBehaviour
         {
             originalRotation = transform.rotation;
         }
-
-        // Désactive la gravité pendant le grab pour éviter que l'objet "vole"
-        if (rb != null)
-        {
-            rb.useGravity = false;
-        }
     }
 
     void OnRelease(SelectExitEventArgs args)
     {
         isGrabbed = false;
 
-        // Réactive la gravité
+        // Si on doit maintenir la hauteur même après release, garde la gravité désactivée
         if (rb != null)
         {
-            rb.useGravity = originalGravity;
+            if (maintainHeightWhenNotGrabbed)
+            {
+                // Garde la gravité désactivée pour que le cube reste sur la surface
+                rb.useGravity = false;
+                // Réinitialise la vélocité verticale pour éviter toute chute
+                Vector3 vel = rb.linearVelocity;
+                vel.y = 0f;
+                rb.linearVelocity = vel;
+            }
+            else
+            {
+                // Réactive la gravité normale
+                rb.useGravity = originalGravity;
+            }
         }
     }
 
@@ -149,12 +174,102 @@ public class XRClampToSurface : MonoBehaviour
         }
     }
 
+    void LateUpdate()
+    {
+        // Applique les contraintes dans LateUpdate() pour corriger APRÈS que le XR toolkit ait déplacé l'objet
+        // LateUpdate s'exécute après tous les Update(), donc après le mouvement du toolkit
+        if (surface != null)
+        {
+            bool shouldConstrain = false;
+            
+            if (isGrabbed && grabInteractable != null && grabInteractable.isSelected)
+            {
+                // Pendant le grab, applique toujours les contraintes
+                shouldConstrain = true;
+            }
+            else if (maintainHeightWhenNotGrabbed)
+            {
+                // Même sans grab, maintient la hauteur si l'option est activée
+                shouldConstrain = true;
+            }
+            
+            if (shouldConstrain)
+            {
+                // Corrige la position Y en douceur pour éviter les sauts
+                if (rb != null && !rb.isKinematic)
+                {
+                    float currentY = rb.position.y;
+                    float deltaY = targetY - currentY;
+                    
+                    // Si le cube a été déplacé, corrige avec une interpolation douce
+                    if (Mathf.Abs(deltaY) > 0.001f)
+                    {
+                        Vector3 pos = rb.position;
+                        
+                        // Pendant le grab, utilise une interpolation très rapide mais pas instantanée
+                        // pour éviter les conflits avec le toolkit
+                        if (isGrabbed)
+                        {
+                            // Interpolation rapide mais douce (85% vers la cible par frame)
+                            pos.y = Mathf.Lerp(currentY, targetY, 0.85f);
+                        }
+                        else
+                        {
+                            // Sans grab, force directement
+                            pos.y = targetY;
+                        }
+                        
+                        rb.position = pos;
+                        
+                        // Réinitialise la vélocité verticale de manière douce
+                        Vector3 vel = rb.linearVelocity;
+                        vel.y = Mathf.Lerp(vel.y, 0f, 0.9f);
+                        rb.linearVelocity = vel;
+                    }
+                }
+                else if (rb == null)
+                {
+                    // Pas de Rigidbody, modifie directement
+                    Vector3 pos = transform.position;
+                    if (Mathf.Abs(pos.y - targetY) > 0.001f)
+                    {
+                        if (isGrabbed)
+                        {
+                            pos.y = Mathf.Lerp(pos.y, targetY, 0.85f);
+                        }
+                        else
+                        {
+                            pos.y = targetY;
+                        }
+                        transform.position = pos;
+                    }
+                }
+            }
+        }
+    }
+
     void FixedUpdate()
     {
-        if (!isGrabbed || grabInteractable == null || !grabInteractable.isSelected || surface == null)
+        if (surface == null)
             return;
 
-        ApplyConstraints();
+        bool shouldConstrain = false;
+        
+        if (isGrabbed && grabInteractable != null && grabInteractable.isSelected)
+        {
+            // Pendant le grab, applique toujours les contraintes
+            shouldConstrain = true;
+        }
+        else if (maintainHeightWhenNotGrabbed)
+        {
+            // Même sans grab, maintient la hauteur si l'option est activée
+            shouldConstrain = true;
+        }
+        
+        if (shouldConstrain)
+        {
+            ApplyConstraints();
+        }
     }
 
     void ApplyConstraints()
@@ -170,37 +285,22 @@ public class XRClampToSurface : MonoBehaviour
             bool useSmoothTransition = timeSinceGrab < GRAB_SMOOTH_DURATION;
             
             // Ne corrige que si l'écart est significatif (évite les tremblements)
+            // Utilise une interpolation douce pour éviter les conflits avec le toolkit
             if (Mathf.Abs(deltaY) > 0.001f)
             {
                 Vector3 pos = rb.position;
                 
-                if (useSmoothTransition)
-                {
-                    // Interpolation douce pendant la transition initiale
-                    float t = timeSinceGrab / GRAB_SMOOTH_DURATION;
-                    pos.y = Mathf.Lerp(currentY, targetY, t * 0.5f + 0.1f); // Transition progressive
-                }
-                else
-                {
-                    // Force directement après la transition
-                    pos.y = targetY;
-                }
+                // Utilise toujours une interpolation douce pour éviter les sauts
+                // Laisse LateUpdate() gérer la correction principale
+                pos.y = Mathf.Lerp(currentY, targetY, 0.7f);
                 
                 rb.MovePosition(pos);
             }
 
-            // Annule doucement la vélocité verticale au lieu de la forcer à zéro brutalement
+            // Annule doucement la vélocité verticale
             Vector3 velocity = rb.linearVelocity;
-            if (Mathf.Abs(velocity.y) > 0.01f)
-            {
-                velocity.y = Mathf.Lerp(velocity.y, 0f, Time.fixedDeltaTime * 20f);
-                rb.linearVelocity = velocity;
-            }
-            else
-            {
-                velocity.y = 0f;
-                rb.linearVelocity = velocity;
-            }
+            velocity.y = Mathf.Lerp(velocity.y, 0f, Time.fixedDeltaTime * 15f);
+            rb.linearVelocity = velocity;
 
             // Contrainte de rotation avec interpolation douce
             if (lockRotation)
