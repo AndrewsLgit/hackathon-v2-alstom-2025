@@ -17,7 +17,7 @@ Solution: Using virtual reality googles, visualization of the box placement can 
 ## Team
 
 
-Andrews Leruth (Technocité), Antoine (RUBIKA), Christian Alexiev (RUBIKA), Deborah Tetart (Technocité), Vincent Vissers (Technocité) et Yasmine Buxant (UCLouvain)
+Andrews Leruth (Technocité), Antoine Cheraft (RUBIKA), Christian Alexiev (RUBIKA), Deborah Tetart (Technocité), Vincent Vissers (Technocité) et Yasmine Buxant (UCLouvain)
 
 
 ## Structure of the folder
@@ -26,6 +26,7 @@ We need all the source files that you used, you can organise your repo as you se
 If you used Miro, Figma or any other cloud based tools please put the links of the source files and add the exported documents.
 
 ## Requirements
+
 
 ## Context
 
